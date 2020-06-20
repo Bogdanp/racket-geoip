@@ -1,4 +1,4 @@
-# geoip
+# geoip ![CI](https://github.com/Bogdanp/racket-geoip/workflows/CI/badge.svg)
 
 Geolocation for Racket based on MaxMind's GeoIP databases.
 
