@@ -1,7 +1,7 @@
 #lang racket/base
 
-(require geoip
-         (for-syntax racket/base)
+(require (for-syntax racket/base)
+         geoip
          racket/runtime-path
          rackunit)
 

@@ -1,64 +1,52 @@
 #lang racket/base
 
-(require racket/bytes
+(require net/ip
          racket/contract/base
-         racket/function
          racket/match
-         net/ip)
+         racket/port)
 
-(provide (contract-out
-          [geoip? (-> any/c boolean?)]
-          [geoip-lookup (-> geoip? string? (or/c false/c hash?))]
-          [make-geoip (-> path-string? geoip?)]))
+(provide
+ (contract-out
+  [geoip? (-> any/c boolean?)]
+  [geoip-lookup (-> geoip? string? (or/c false/c hash?))]
+  [make-geoip (-> path-string? geoip?)]))
 
 
 ;; Public API ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (make-geoip path)
-  (define buffer (make-bytes 16384))
-  (call-with-input-file path
-    (lambda (in)
-      (let loop ([chunks '()])
-        (match (read-bytes-avail!/enable-break buffer in)
-          [(? eof-object?)
-           (define bs (bytes->immutable-bytes (bytes-join (reverse chunks) #"")))
+  (define bs (call-with-input-file path port->bytes))
+  (define-values (metadata-marker-start metadata-marker-end)
+    (find-metadata-marker bs))
 
-           (define metadata-marker (bytes-find-last bs METADATA-MARKER))
-           (unless metadata-marker
-             (error 'make-geoip "could not find metadata marker in database file"))
+  (define-values (_ metadata)
+    (decode-field bs metadata-marker-end))
 
-           (define-values (_ metadata)
-             (decode-field bs (+ (bytes-length METADATA-MARKER) metadata-marker)))
+  (define format-version (hash-ref metadata "binary_format_major_version"))
+  (unless (= format-version 2)
+    (error 'make-geoip (format "database version ~a not supported" format-version)))
 
-           (define format-version (hash-ref metadata "binary_format_major_version"))
-           (unless (= format-version 2)
-             (error 'make-geoip (format "database version ~a not supported" format-version)))
+  (define record-size (hash-ref metadata "record_size"))
+  (define node-count (hash-ref metadata "node_count"))
+  (define tree-size (* (/ (* record-size 2) 8) node-count))
+  (define tree (subbytes bs 0 tree-size))
+  (define data (subbytes bs (+ 16 tree-size) metadata-marker-start))
 
-           (define record-size (hash-ref metadata "record_size"))
-           (define node-count (hash-ref metadata "node_count"))
-           (define tree-size (* (/ (* record-size 2) 8) node-count))
-           (define tree (subbytes bs 0 tree-size))
-           (define data (subbytes bs (+ 16 tree-size) metadata-marker))
-
-           (geoip tree data metadata node-count record-size)]
-
-          [n-bytes-read
-           (define chunk (subbytes buffer 0 n-bytes-read))
-           (loop (cons chunk chunks))])))))
+  (geoip tree data metadata node-count record-size))
 
 (define (geoip-lookup a-geoip ip)
   (define node-count (geoip-node-count a-geoip))
   (define ip-address (string->geoip-ip-address a-geoip ip))
 
-  (let loop ([bytes (ip-address->bytes ip-address)]
+  (let loop ([bs (ip-address->bytes ip-address)]
              [bits null]
              [index 0])
     (cond
-      [(equal? bytes #"")   #f]
+      [(equal? bs #"")      #f]
       [(= index node-count) #f]
 
       [(null? bits)
-       (loop (subbytes bytes 1) (byte->bitlist (bytes-ref bytes 0)) index)]
+       (loop (subbytes bs 1) (byte->bitlist (bytes-ref bs 0)) index)]
 
       [else
        (define-values (lhs rhs)
@@ -71,12 +59,10 @@
 
        (if (> index* node-count)
            (geoip-data-ref a-geoip index*)
-           (loop bytes (cdr bits) index*))])))
+           (loop bs (cdr bits) index*))])))
 
 
 ;; Private API ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define METADATA-MARKER #"\xAB\xCD\xEFMaxMind.com")
 
 (struct geoip (tree data metadata node-count record-size))
 
@@ -91,20 +77,23 @@
 (define (ipv4-address->ipv6-address addr)
   (make-ip-address (bitwise-ior #xFFFF00000000 (ip-address->number addr)) 6))
 
-(define (bytes-find-last bs subbs)
-  (define step (bytes-length subbs))
-  (for/first ([i (in-range (- (bytes-length bs) step) -1 -1)]
-              #:when (equal? subbs (subbytes bs i (+ i step))))
-    i))
+(define (find-metadata-marker bs)
+  (match (regexp-match-positions* #rx#"\xAB\xCD\xEFMaxMind.com" bs)
+    [(list _ ... (cons start end)) (values start end)]
+    [_ (error 'make-geoip "could not find metadata marker in database file")]))
 
 
 ;;; Tree Lookups ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (geoip-tree-ref a-geoip i)
-  (match (geoip-record-size a-geoip)
-    [24 (decode-node/24 (geoip-tree a-geoip) i)]
-    [28 (decode-node/28 (geoip-tree a-geoip) i)]
-    [32 (decode-node/32 (geoip-tree a-geoip) i)]))
+  (define size (geoip-record-size a-geoip))
+  (define decoder
+    (case size
+      [(24) decode-node/24]
+      [(28) decode-node/28]
+      [(32) decode-node/32]
+      [else (error 'geoip-tree-ref "unexpected record size: ~a" size)]))
+  (decoder (geoip-tree a-geoip) i))
 
 (define (decode-node/24 tree i)
   (define start-idx (* i 6))
@@ -148,28 +137,28 @@
   value)
 
 (define (decode-field bs [start 0])
-  (match (arithmetic-shift (bytes-ref bs start) -5)
-    [1
-     (let*-values ([(pos pointer) (decode-pointer bs start)]
-                   [(_   field)   (decode-field bs pointer)])
-       (values pos field))]
+  (case (arithmetic-shift (bytes-ref bs start) -5)
+    [(1)
+     (define-values (pos pointer) (decode-pointer bs start))
+     (define-values (_     field) (decode-field bs pointer))
+     (values pos field)]
 
-    [2 (decode-string     bs start)]
-    [3 (decode-double     bs start)]
-    [4 (decode-bytes      bs start)]
-    [5 (decode-uint/16/32 bs start)]
-    [6 (decode-uint/16/32 bs start)]
-    [7 (decode-map        bs start)]
-    [0
-     (match (+ (bytes-ref bs (add1 start)) 7)
-       [8  (decode-int32       bs start)]
-       [9  (decode-uint/64/128 bs start)]
-       [10 (decode-uint/64/128 bs start)]
-       [11 (decode-array       bs start)]
-       [12 (decode-dcc         bs start)]
-       [13 (decode-end-marker  bs start)]
-       [14 (decode-boolean     bs start)]
-       [15 (decode-float       bs start)])]))
+    [(2) (decode-string     bs start)]
+    [(3) (decode-double     bs start)]
+    [(4) (decode-bytes      bs start)]
+    [(5) (decode-uint/16/32 bs start)]
+    [(6) (decode-uint/16/32 bs start)]
+    [(7) (decode-map        bs start)]
+    [(0)
+     (case (+ (bytes-ref bs (add1 start)) 7)
+       [(8)  (decode-int32       bs start)]
+       [(9)  (decode-uint/64/128 bs start)]
+       [(10) (decode-uint/64/128 bs start)]
+       [(11) (decode-array       bs start)]
+       [(12) (decode-dcc         bs start)]
+       [(13) (decode-end-marker  bs start)]
+       [(14) (decode-boolean     bs start)]
+       [(15) (decode-float       bs start)])]))
 
 (define (decode-size bs i)
   (define b (bytes-ref bs i))
@@ -190,26 +179,26 @@
   (define ss  (bitwise-and #b11 (arithmetic-shift b -3)))
   (define vvv (bitwise-and #b111 b))
 
-  (match ss
-    [0 (values (+ 2 start)
-               (bitwise-ior (arithmetic-shift vvv 8)
-                            (bytes-ref bs (add1 start))))]
+  (case ss
+    [(0) (values (+ 2 start)
+                 (bitwise-ior (arithmetic-shift vvv 8)
+                              (bytes-ref bs (add1 start))))]
 
-    [1 (values (+ 3 start)
-               (+ 2048
-                  (bitwise-ior (arithmetic-shift vvv 16)
-                               (arithmetic-shift (bytes-ref bs (add1 start)) 8)
-                               (bytes-ref bs (+ 2 start)))))]
+    [(1) (values (+ 3 start)
+                 (+ 2048
+                    (bitwise-ior (arithmetic-shift vvv 16)
+                                 (arithmetic-shift (bytes-ref bs (add1 start)) 8)
+                                 (bytes-ref bs (+ 2 start)))))]
 
-    [2 (values (+ 4 start)
-               (+ 526336
-                  (bitwise-ior (arithmetic-shift vvv 24)
-                               (arithmetic-shift (bytes-ref bs (+ 1 start)) 16)
-                               (arithmetic-shift (bytes-ref bs (+ 2 start)) 8)
-                               (bytes-ref bs (+ 3 start)))))]
+    [(2) (values (+ 4 start)
+                 (+ 526336
+                    (bitwise-ior (arithmetic-shift vvv 24)
+                                 (arithmetic-shift (bytes-ref bs (+ 1 start)) 16)
+                                 (arithmetic-shift (bytes-ref bs (+ 2 start)) 8)
+                                 (bytes-ref bs (+ 3 start)))))]
 
-    [3 (values (+ 5 start)
-               (decode-integer bs (add1 start) 4))]))
+    [(3) (values (+ 5 start)
+                 (decode-integer bs (add1 start) 4))]))
 
 (define (decode-string bs start)
   (define-values (data-start size)
