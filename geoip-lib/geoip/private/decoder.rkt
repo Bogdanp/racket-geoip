@@ -1,15 +1,17 @@
 #lang racket/base
 
 (require net/ip
-         racket/contract/base
          racket/match
          racket/port)
 
 (provide
- (contract-out
-  [geoip? (-> any/c boolean?)]
-  [geoip-lookup (-> geoip? string? (or/c false/c hash?))]
-  [make-geoip (-> path-string? geoip?)]))
+ make-geoip
+ geoip?
+ geoip-lookup
+
+ decode-field
+ decode-pointer
+ decode-integer)
 
 
 ;; Public API ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -303,10 +305,3 @@
           (floating-point-bytes->real bs #t
                                       (+ 2 start)
                                       (+ 6 start))))
-
-
-(module+ testing
-  (provide
-   decode-field
-   decode-pointer
-   decode-integer))

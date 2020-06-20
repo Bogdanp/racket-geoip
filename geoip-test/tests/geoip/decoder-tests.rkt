@@ -1,7 +1,7 @@
 #lang racket/base
 
 (require (for-syntax racket/base)
-         (submod geoip/private/decoder testing)
+         geoip/private/decoder
          racket/runtime-path
          rackunit)
 

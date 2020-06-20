@@ -1,4 +1,10 @@
 #lang racket/base
 
-(require "private/decoder.rkt")
-(provide (all-from-out "private/decoder.rkt"))
+(require racket/contract
+         "private/decoder.rkt")
+
+(provide
+ (contract-out
+  [make-geoip (-> path-string? geoip?)]
+  [geoip? (-> any/c boolean?)]
+  [geoip-lookup (-> geoip? string? (or/c false/c hash?))]))
