@@ -12,4 +12,17 @@ jobs:
           variant: CS
           version: 7.7
       - run: raco pkg install --batch --auto geoip-lib/ geoip-test/ geoip-doc/ geoip/
+      - name: Download MaxMind DBs
+        run: |
+          export REPO="$(pwd)"
+          (pushd /tmp \
+             && curl -L "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" > GeoLite2-City.tar.gz \
+             && curl -L "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" > GeoLite2-Country.tar.gz \
+             && tar xvzf GeoLite2-City.tar.gz \
+             && tar xvzf GeoLite2-Country.tar.gz \
+             && mv GeoLite2-City_*/GeoLite2-City.mmdb "$REPO/geoip-test/fixtures/dbs/" \
+             && mv GeoLite2-Country_*/GeoLite2-Country.mmdb "$REPO/geoip-test/fixtures/dbs/")
+        env:
+          MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+
       - run: raco test geoip-test/
