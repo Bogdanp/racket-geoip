@@ -31,18 +31,18 @@
    "country-db"
 
    (when (file-exists? country-db-path)
-     (define geoip (make-geoip country-db-path))
+     (define g (make-geoip country-db-path))
 
      (test-case "it returns #f given a private IPv4 address"
-       (check-eq? (geoip-lookup geoip "127.0.0.1") #f))
+       (check-eq? (geoip-lookup g "127.0.0.1") #f))
 
      (test-case "it returns expected results given a known IP address"
-       (check-equal? (country-data-iso-code (geoip-lookup geoip "188.24.7.80")) "RO")
-       (check-equal? (country-data-translation (geoip-lookup geoip "188.24.7.80") "ru") "Румыния")
-       (check-equal? (country-data-translation (geoip-lookup geoip "188.24.7.80") "ja") "ルーマニア")
+       (check-equal? (country-data-iso-code (geoip-lookup g "188.24.7.80")) "RO")
+       (check-equal? (country-data-translation (geoip-lookup g "188.24.7.80") "ru") "Румыния")
+       (check-equal? (country-data-translation (geoip-lookup g "188.24.7.80") "ja") "ルーマニア")
 
-       (check-equal? (country-data-iso-code  (geoip-lookup geoip "172.217.16.110")) "US")
-       (check-equal? (country-data-translation  (geoip-lookup geoip "172.217.16.110") "zh-CN") "美国")))))
+       (check-equal? (country-data-iso-code  (geoip-lookup g "172.217.16.110")) "US")
+       (check-equal? (country-data-translation  (geoip-lookup g "172.217.16.110") "zh-CN") "美国")))))
 
 (define (city-data-translation result lang)
   (hash-ref (hash-ref (hash-ref result "city") "names") lang))
@@ -52,18 +52,51 @@
    "city-db"
 
    (when (file-exists? city-db-path)
-     (define geoip (make-geoip city-db-path))
+     (define g (make-geoip city-db-path))
 
      (test-case "it returns #f given a private IPv4 address"
-       (check-eq? (geoip-lookup geoip "127.0.0.1") #f))
+       (check-eq? (geoip-lookup g "127.0.0.1") #f))
 
      (test-case "it returns expected results given a known IP address"
-       (define res (geoip-lookup geoip "188.24.7.80"))
+       (define res (geoip-lookup g "188.24.7.80"))
        (check-equal? (city-data-translation res "en") "Cluj-Napoca")
        (check-equal? (city-data-translation res "ja") "クルジュ＝ナポカ")
-       (check-equal? (country-data-iso-code (geoip-lookup geoip "188.24.7.80")) "RO")
-       (check-equal? (country-data-translation (geoip-lookup geoip "188.24.7.80") "ru") "Румыния")
-       (check-equal? (country-data-translation (geoip-lookup geoip "188.24.7.80") "ja") "ルーマニア")))))
+       (check-equal? (country-data-iso-code (geoip-lookup g "188.24.7.80")) "RO")
+       (check-equal? (country-data-translation (geoip-lookup g "188.24.7.80") "ru") "Румыния")
+       (check-equal? (country-data-translation (geoip-lookup g "188.24.7.80") "ja") "ルーマニア"))
+
+     (test-case "it finds known addresses"
+       (define addrs
+         '("127.0.0.1"
+           "188.24.7.80"
+           "67.212.234.157"
+           "172.58.175.36"
+           "179.43.102.6"
+           "185.244.96.150"
+           "95.148.7.63"
+           "81.174.148.38"
+           "156.146.56.131"
+           "91.175.157.15"
+           "88.127.127.97"))
+
+       (define expected
+         '(#f
+           "Cluj-Napoca"
+           "Salt Lake City"
+           "Tampa"
+           "Tigre"
+           "Gdansk"
+           "Milton Keynes"
+           "Banstead"
+           "Singapore"
+           "Thonon-les-Bains"
+           "Antony"))
+
+       (check-equal?
+        (for/list ([addr (in-list addrs)])
+          (define data (geoip-lookup g addr))
+          (and data (city-data-translation data "en")))
+        expected)))))
 
 (module+ test
   (require rackunit/text-ui)

@@ -44,24 +44,26 @@
              [bits null]
              [index 0])
     (cond
-      [(equal? bs #"")      #f]
-      [(= index node-count) #f]
+      [(= node-count index) #f]
 
       [(null? bits)
-       (loop (subbytes bs 1) (byte->bitlist (bytes-ref bs 0)) index)]
+       (and (not (bytes=? bs #""))
+            (loop (subbytes bs 1)
+                  (byte->bitlist (bytes-ref bs 0))
+                  index))]
 
       [else
        (define-values (lhs rhs)
          (geoip-tree-ref a-geoip index))
 
-       (define index*
-         (if (= (car bits) 0)
+       (define new-index
+         (if (zero? (car bits))
              lhs
              rhs))
 
-       (if (> index* node-count)
-           (geoip-data-ref a-geoip index*)
-           (loop bs (cdr bits) index*))])))
+       (if (> new-index node-count)
+           (geoip-data-ref a-geoip new-index)
+           (loop bs (cdr bits) new-index))])))
 
 
 ;; Private API ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -289,10 +291,10 @@
        (let-values ([(npos v) (decode-field bs pos)])
          (loop (cons v a) (sub1 rem) npos))])))
 
-(define (decode-dcc bs start)
+(define (decode-dcc _bs _start)
   (error 'decode-dcc "cannot read data cache containers"))
 
-(define (decode-end-marker bs start)
+(define (decode-end-marker _bs _start)
   (error 'decode-end-marker "cannot read end markers"))
 
 (define (decode-boolean bs start)
