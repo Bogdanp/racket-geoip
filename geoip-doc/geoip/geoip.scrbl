@@ -47,6 +47,8 @@ perform lookups using @racket[geoip-lookup].  For example:
 
 @defproc[(geoip-metadata [geoip geoip?]) (hash/c string? any/c)]{
   Returns the metadata for the given @racket[geoip] database.
+
+  @history[#:added "0.2"]
 }
 
 @defproc[(geoip-lookup [geoip geoip?]
