@@ -56,6 +56,9 @@
    (when (file-exists? city-db-path)
      (define g (make-geoip city-db-path))
 
+     (test-case "it returns the metadata"
+       (check-equal? (hash-ref (geoip-metadata g) "database_type") "GeoLite2-City"))
+
      (test-case "it returns #f given a private IPv4 address"
        (check-eq? (geoip-lookup g "127.0.0.1") #f))
 

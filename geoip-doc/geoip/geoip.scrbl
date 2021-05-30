@@ -45,6 +45,13 @@ perform lookups using @racket[geoip-lookup].  For example:
   invalid.
 }
 
-@defproc[(geoip-lookup (geoip geoip?) (ip string?)) (or/c false/c hash?)]{
-  Looks up an IP address in the database and returns a hash on success.
+@defproc[(geoip-metadata [geoip geoip?]) (hash/c string? any/c)]{
+  Returns the metadata for the given @racket[geoip] database.
+}
+
+@defproc[(geoip-lookup [geoip geoip?]
+                       [ip string?]) (or/c false/c hash?)]{
+  Looks up an @racket[ip] in the @racket[geoip] database and returns a
+  hash of information about the address on success or @racket[#f] when
+  the address cannot be found.
 }

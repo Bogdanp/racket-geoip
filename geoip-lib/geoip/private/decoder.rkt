@@ -7,6 +7,7 @@
 (provide
  make-geoip
  geoip?
+ geoip-metadata
  geoip-lookup
 
  decode-field
