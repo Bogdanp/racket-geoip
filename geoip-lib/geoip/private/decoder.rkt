@@ -150,25 +150,31 @@
      (define-values (_     value) (decode-field bs pointer))
      (values pos value)]
 
-    [(2) (decode-string     bs start)]
-    [(3) (decode-double     bs start)]
-    [(4) (decode-bytes      bs start)]
-    [(5) (decode-uint/16/32 bs start)]
-    [(6) (decode-uint/16/32 bs start)]
-    [(7) (decode-map        bs start)]
+    [(2 3 4 5 6 7)
+     (define-values (data-start size)
+       (decode-size bs start))
+
+     (case type
+       [(2)   (decode-string bs data-start size)]
+       [(3)   (decode-double bs data-start size)]
+       [(4)   (decode-bytes  bs data-start size)]
+       [(5 6) (decode-uint   bs data-start size)]
+       [(7)   (decode-map    bs data-start size)])]
+
     [(0)
      (define subtype
        (+ (bytes-ref bs (add1 start)) 7))
+     (define-values (data-start size)
+       (decode-size bs start (+ start 2)))
      (case subtype
-       [(8)  (decode-int32       bs start)]
-       [(9)  (decode-uint/64/128 bs start)]
-       [(10) (decode-uint/64/128 bs start)]
-       [(11) (decode-array       bs start)]
-       [(12) (decode-dcc         bs start)]
-       [(13) (decode-end-marker  bs start)]
-       [(14) (decode-boolean     bs start)]
-       [(15) (decode-float       bs start)]
-       [else (raise-argument-error 'decode-field "(integer-in 8 15)" subtype)])]))
+       [(8)    (decode-int32      bs data-start size)]
+       [(9 10) (decode-uint       bs data-start size)]
+       [(11)   (decode-array      bs data-start size)]
+       [(12)   (decode-dcc        bs data-start size)]
+       [(13)   (decode-end-marker bs data-start size)]
+       [(14)   (decode-boolean    bs data-start size)]
+       [(15)   (decode-float      bs data-start size)]
+       [else   (raise-argument-error 'decode-field "(integer-in 8 15)" subtype)])]))
 
 (define (decode-size bs i [npos (add1 i)])
   (define b (bytes-ref bs i))
@@ -212,49 +218,36 @@
 
     [else (raise-argument-error 'decode-pointer "a valid pointer" b)]))
 
-(define (decode-string bs start)
-  (define-values (data-start size)
-    (decode-size bs start))
-
+(define (decode-string bs start size)
   (cond
     [(= size 0)
-     (values (add1 data-start) "")]
+     (values start "")]
 
     [else
-     (values (+ data-start size)
-             (bytes->string/utf-8 bs #f data-start (+ data-start size)))]))
+     (define end (+ start size))
+     (values end (bytes->string/utf-8 bs #f start end))]))
 
-(define (decode-double bs start)
-  (values (+ 9 start)
-          (floating-point-bytes->real bs #t
-                                      (+ 1 start)
-                                      (+ 9 start))))
+(define (decode-double bs start size)
+  (define end (+ start size))
+  (values end (floating-point-bytes->real bs #t start end)))
 
-(define (decode-bytes bs start)
-  (define-values (data-start size)
-    (decode-size bs start))
-
+(define (decode-bytes bs start size)
   (cond
     [(= size 0)
-     (values (add1 data-start) #"")]
+     (values start #"")]
 
     [else
-     (values (+ data-start size)
-             (subbytes bs data-start (+ data-start size)))]))
+     (define end (+ start size))
+     (values end (subbytes bs start end))]))
 
-(define (decode-uint/16/32 bs start)
-  (define-values (data-start size)
-    (decode-size bs start))
+(define (decode-uint bs start size)
+  (define end (+ start size))
+  (values end (decode-integer bs start size)))
 
-  (values (+ data-start size) (decode-integer bs data-start size)))
-
-(define (decode-map bs start)
-  (define-values (data-start num-pairs)
-    (decode-size bs start))
-
+(define (decode-map bs start size)
   (let loop ([m (hash)]
-             [rem num-pairs]
-             [pos data-start])
+             [rem size]
+             [pos start])
     (cond
       [(= rem 0)
        (values pos m)]
@@ -264,33 +257,23 @@
                      [(npos v) (decode-field bs vpos)])
          (loop (hash-set m k v) (sub1 rem) npos))])))
 
-(define (decode-int32 bs start)
-  (define-values (data-start size)
-    (decode-size bs start))
-
-  (define unsigned (decode-integer bs (add1 data-start) size))
+(define (decode-int32 bs start size)
+  (define unsigned
+    (decode-integer bs start size))
   (define signed
     (cond
-      [(= 1 (arithmetic-shift (bytes-ref bs (add1 data-start)) -7))
+      [(= 1 (arithmetic-shift (bytes-ref bs start) -7))
        (- unsigned (expt 2 (* 8 size)))]
 
-      [else unsigned]))
+      [else
+       unsigned]))
 
-  (values (+ data-start size) signed))
+  (values (+ start size) signed))
 
-(define (decode-uint/64/128 bs start)
-  (define-values (data-start size)
-    (decode-size bs start))
-  (values (add1 (+ data-start size))
-          (decode-integer bs (add1 data-start) size)))
-
-(define (decode-array bs start)
-  (define-values (data-start num-items)
-    (decode-size bs start (+ start 2)))
-
+(define (decode-array bs start size)
   (let loop ([a null]
-             [rem num-items]
-             [pos data-start])
+             [rem size]
+             [pos start])
     (cond
       [(= rem 0)
        (values pos (reverse a))]
@@ -305,13 +288,9 @@
 (define (decode-end-marker _bs _start)
   (error 'decode-end-marker "cannot read end markers"))
 
-(define (decode-boolean bs start)
-  (define-values (_ value)
-    (decode-size bs start))
-  (values (+ 2 start) (not (= 0 value))))
+(define (decode-boolean _bs start size)
+  (values start (not (= 0 size))))
 
-(define (decode-float bs start)
-  (values (+ 7 start)
-          (floating-point-bytes->real bs #t
-                                      (+ 2 start)
-                                      (+ 6 start))))
+(define (decode-float bs start size)
+  (define end (+ start size))
+  (values end (floating-point-bytes->real bs #t start end)))

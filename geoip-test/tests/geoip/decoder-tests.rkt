@@ -8,13 +8,14 @@
 (provide
  decoder-tests)
 
-(define (decode-one-field bs [start 0])
-  (define-values (_ value) (decode-field bs start))
-  value)
+(define-check (check-pointer= bs expected-value)
+  (let-values ([(_ value) (decode-pointer bs 0)])
+    (check-eqv? value expected-value)))
 
-(define (decode-one-pointer bs [start 0])
-  (define-values (_ value) (decode-pointer bs start))
-  value)
+(define-check (check-pos&field bs expected-pos expected-value)
+  (let-values ([(pos value) (decode-field bs)])
+    (check-equal? pos expected-pos)
+    (check-equal? value expected-value)))
 
 (define decoder-tests
   (test-suite
@@ -26,116 +27,90 @@
     (test-suite
      "pointers"
 
-     (check-equal? (decode-one-pointer (bytes #b00100111 #xFF))                2047)
-     (check-equal? (decode-one-pointer (bytes #b00101101 #xFF #x10))           (+ 392976 2048))
-     (check-equal? (decode-one-pointer (bytes #b00110101 #xFF #x10 #xFF))      (+ 100602111 526336))
-     (check-equal? (decode-one-pointer (bytes #b00111101 #xFF #xFF #x10 #xFF)) #xFFFF10FF))
+     (check-pointer= (bytes #b00100111 #xFF)                2047)
+     (check-pointer= (bytes #b00101101 #xFF #x10)           (+ 392976 2048))
+     (check-pointer= (bytes #b00110101 #xFF #x10 #xFF)      (+ 100602111 526336))
+     (check-pointer= (bytes #b00111101 #xFF #xFF #x10 #xFF) #xFFFF10FF))
 
     (test-suite
      "strings"
 
-     (check-equal? (decode-one-field (bytes #b01000000)) "")
-     (check-equal? (decode-one-field (bytes #b01000010 #xCE #xBB)) "λ"))
+     (check-pos&field (bytes #b01000000) 1 "")
+     (check-pos&field (bytes #b01000101 65 65 65 65 65) 6 "AAAAA")
+     (check-pos&field (bytes #b01000010 #xCE #xBB) 3 "λ"))
 
     (test-suite
      "doubles"
 
-     (check-equal? (decode-one-field (bytes #b01100000 #x00       #x00       #x00       #x00 #x00 #x00 #x00 #x00)) 0.0)
-     (check-equal? (decode-one-field (bytes #b01100000 #b01000000 #b01000101 #b01100000 #x00 #x00 #x00 #x00 #x00)) 42.75))
+     (check-pos&field (bytes #b01101000 #x00       #x00       #x00       #x00 #x00 #x00 #x00 #x00) 9 0.0)
+     (check-pos&field (bytes #b01101000 #b01000000 #b01000101 #b01100000 #x00 #x00 #x00 #x00 #x00) 9 42.75))
 
     (test-suite
      "bytes"
 
-     (check-equal? (decode-one-field (bytes #b10000000)) #"")
-     (check-equal? (decode-one-field (bytes #b10000010 #xCE #xBB)) #"\xCE\xBB"))
+     (check-pos&field (bytes #b10000000) 1 #"")
+     (check-pos&field (bytes #b10000010 #xCE #xBB) 3 #"\xCE\xBB"))
 
     (test-suite
-     "unsigned integers"
+     "unsigned 16/32-bit integers"
 
-     (check-equal? (decode-one-field (bytes #b10100010 #xFF #x10)) #xFF10)
-     ;; TODO: Is this to spec?
-     (check-equal? (decode-one-field (bytes #b11000010 #xFF #x00 #xFF #x10)) #xFF00)
-     (check-equal? (decode-one-field (bytes #b11000100 #xFF #x00 #xFF #x10)) #xFF00FF10)
-     (check-equal? (decode-one-field (bytes #b00001000 2
-                                            #xFF #xFF #xAB #xCD #x00 #xFF #x12 #x00))
-                   #xFFFFABCD00FF1200))
+     (check-pos&field (bytes #b10100010 #xFF #x10) 3 #xFF10)
+     (check-pos&field (bytes #b11000010 #xFF #x00 #xFF #x10) 3 #xFF00)
+     (check-pos&field (bytes #b11000100 #xFF #x00 #xFF #x10) 5 #xFF00FF10))
 
     (test-suite
      "maps"
 
-     (check-equal? (decode-one-field (bytes #b11100000)) (hash))
-
-     (check-equal? (decode-one-field (bytes #b11100001
-                                            #b01000010 65 65
-                                            #b10100001 42))
-                   (hash "AA" 42))
-
-     (check-equal? (decode-one-field (bytes #b11100010
-                                            #b01000010 65 65
-                                            #b10100001 42
-                                            #b01000010 65 65
-                                            #b10100001 24))
-                   (hash "AA" 24)))
+     (check-pos&field (bytes #b11100000) 1 (hash))
+     (check-pos&field (bytes #b11100001 #b01000010 65 65 #b10100001 42) 6 (hash "AA" 42))
+     (check-pos&field (bytes #b11100010 #b01000010 65 65 #b10100001 42 #b01000010 65 65 #b10100001 24) 11 (hash "AA" 24)))
 
     (test-suite
      "signed integers"
 
-     (check-equal? (decode-one-field (bytes #b00000100 1
-                                            #x00 #xFF #x00 #xFF))
-                   #x00FF00FF)
+     (check-pos&field (bytes #b00000100 1 #x00 #xFF #x00 #xFF) 6 #x00FF00FF)
+     (check-pos&field (bytes #b00000100 1 #xFF #xFF #xFF #xFF) 6 -1)
+     (check-pos&field (bytes #b00000100 1 #x80 #x00 #x00 #x00) 6 -2147483648)
+     (check-pos&field (bytes #b00000001 1 #b10010010) 3 -110))
 
-     (check-equal? (decode-one-field (bytes #b00000100 1
-                                            #xFF #xFF #xFF #xFF))
-                   -1)
+    (test-suite
+     "unsigned 64/128-bit integers"
 
-     (check-equal? (decode-one-field (bytes #b00000100 1
-                                            #x80 #x00 #x00 #x00))
-                   -2147483648)
-
-     (check-equal? (decode-one-field (bytes #b00000001 1
-                                            #b10010010))
-                   -110))
+     (check-pos&field (bytes #b00001000 #b00000010 #xFF #xEE #xDD #xCC #xBB #xAA #x99 #x88) 10 #xFFEEDDCCBBAA9988)
+     (check-pos&field (bytes #b00010000 #b00000011 #xFF #xEE #xDD #xCC #xBB #xAA #x99 #x88 #x77 #x66 #x55 #x44 #x33 #x22 #x11 #x00) 18 #xFFEEDDCCBBAA99887766554433221100))
 
     (test-suite
      "array"
 
-     (check-equal? (decode-one-field (bytes #b00000000 #b00000100)) null)
-
-     (check-equal? (decode-one-field (bytes #b00000001 #b00000100
-                                            #b10100001 42))
-                   '(42))
-
-     (check-equal? (decode-one-field (bytes #b00000010 #b00000100
-                                            #b10100001 42
-                                            #b10100001 24))
-                   '(42 24))
-
-     (check-equal? (decode-one-field (bytes #b11100001
-                                            #b01000001 (char->integer #\a)
-                                            #b00000010 #b00000100
-                                            #b10100001 1
-                                            #b10100001 2))
-                   (hash "a" '(1 2)))
-
-     (check-equal? (decode-one-field (call-with-output-bytes
-                                      (lambda (out)
-                                        (write-bytes (bytes #b00011101 #b00000100 #b00000011) out)
-                                        (for/list ([_ (in-range 32)])
-                                          (write-bytes (bytes #b10100001 1) out)))))
-                   (make-list 32 1)))
+     (check-pos&field (bytes #b00000000 #b00000100) 2 null)
+     (check-pos&field (bytes #b00000001 #b00000100 #b10100001 42) 4 '(42))
+     (check-pos&field (bytes #b00000010 #b00000100 #b10100001 42 #b10100001 24) 6 '(42 24))
+     (check-pos&field (call-with-output-bytes
+                       (lambda (out)
+                         (write-bytes (bytes #b00011101 #b00000100 #b00000011) out)
+                         (for/list ([_ (in-range 32)])
+                           (write-bytes (bytes #b10100001 1) out))))
+                      67 (make-list 32 1)))
 
     (test-suite
      "booleans"
 
-     (check-eq? (decode-one-field (bytes #b00000000 7)) #f)
-     (check-eq? (decode-one-field (bytes #b00000001 7)) #t)
-     (check-eq? (decode-one-field (bytes #b00000010 7)) #t))
+     (check-pos&field (bytes #b00000000 #b00000111) 2 #f)
+     (check-pos&field (bytes #b00000001 #b00000111) 2 #t)
+     (check-pos&field (bytes #b00000010 #b00000111) 2 #t))
 
     (test-suite
      "floats"
 
-     (check-equal? (decode-one-field (bytes #b00000000 8 #x00       #x00       #x00 #x00)) 0.0)
-     (check-equal? (decode-one-field (bytes #b00000000 8 #b01000010 #b00101011 #x00 #x00)) 42.75)))
+     (check-pos&field (bytes #b00000100 8 #x00       #x00       #x00 #x00) 6 0.0)
+     (check-pos&field (bytes #b00000100 8 #b01000010 #b00101011 #x00 #x00) 6 42.75)))
+
+   (test-suite
+    "decode-int32"
+
+    (check-pos&field (bytes #b00000001 #b00000001 #b00000010) 3 2)
+    (check-pos&field (bytes #b00000010 #b00000001 #b00000000 #b00000010) 4 2)
+    (check-pos&field (bytes #b00000010 #b00000001 #b10000000 #b00000000) 4 -32768))
 
    (test-suite
     "decode-integer"
