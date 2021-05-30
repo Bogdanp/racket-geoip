@@ -2,15 +2,17 @@ name: CI
 on: [push, pull_request]
 jobs:
   build:
-    name: Build & Test
+    name: Build & Test on Racket ${{ matrix.version }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: [ '6.7', 'stable' ]
     steps:
       - uses: actions/checkout@master
-      - uses: Bogdanp/setup-racket@v0.8
+      - uses: Bogdanp/setup-racket@v1.4
         with:
           architecture: x64
-          variant: CS
-          version: 7.7
+          version: ${{ matrix.version }}
       - run: raco pkg install --batch --auto geoip-lib/ geoip-test/ geoip-doc/ geoip/
       - name: Download MaxMind DBs
         run: |
