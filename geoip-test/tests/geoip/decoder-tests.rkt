@@ -24,10 +24,10 @@
     (test-suite
      "pointers"
 
-     (check-equal? (decode-one-pointer (bytes #b00100111 #xFF) 0)                2047)
-     (check-equal? (decode-one-pointer (bytes #b00101101 #xFF #x10) 0)           (+ 392976 2048))
-     (check-equal? (decode-one-pointer (bytes #b00110101 #xFF #x10 #xFF) 0)      (+ 100602111 526336))
-     (check-equal? (decode-one-pointer (bytes #b00111101 #xFF #xFF #x10 #xFF) 0) #xFFFF10FF))
+     (check-equal? (decode-one-pointer (bytes #b00100111 #xFF))                2047)
+     (check-equal? (decode-one-pointer (bytes #b00101101 #xFF #x10))           (+ 392976 2048))
+     (check-equal? (decode-one-pointer (bytes #b00110101 #xFF #x10 #xFF))      (+ 100602111 526336))
+     (check-equal? (decode-one-pointer (bytes #b00111101 #xFF #xFF #x10 #xFF)) #xFFFF10FF))
 
     (test-suite
      "strings"
@@ -106,7 +106,14 @@
      (check-equal? (decode-one-field (bytes #b00000010 #b00000100
                                             #b10100001 42
                                             #b10100001 24))
-                   '(42 24)))
+                   '(42 24))
+
+     (check-equal? (decode-one-field (bytes #b11100001
+                                            #b01000001 (char->integer #\a)
+                                            #b00000010 #b00000100
+                                            #b10100001 1
+                                            #b10100001 2))
+                   (hash "a" '(1 2))))
 
     (test-suite
      "booleans"

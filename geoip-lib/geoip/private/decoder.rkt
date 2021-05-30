@@ -22,7 +22,7 @@
     (find-metadata-marker bs))
 
   (define-values (_ metadata)
-    (decode-field bs metadata-marker-end))
+    (decode-field (subbytes bs metadata-marker-end)))
 
   (define format-version (hash-ref metadata "binary_format_major_version"))
   (unless (= format-version 2)
@@ -135,13 +135,16 @@
 ;;; Data Lookups ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (geoip-data-ref a-geoip i)
+  (define pos (- i (geoip-node-count a-geoip) 16))
   (define-values (_ value)
-    (decode-field (geoip-data a-geoip) (- i (geoip-node-count a-geoip) 16)))
+    (decode-field (geoip-data a-geoip) pos))
 
   value)
 
 (define (decode-field bs [start 0])
-  (case (arithmetic-shift (bytes-ref bs start) -5)
+  (define type
+    (arithmetic-shift (bytes-ref bs start) -5))
+  (case type
     [(1)
      (define-values (pos pointer) (decode-pointer bs start))
      (define-values (_     value) (decode-field bs pointer))
@@ -154,7 +157,9 @@
     [(6) (decode-uint/16/32 bs start)]
     [(7) (decode-map        bs start)]
     [(0)
-     (case (+ (bytes-ref bs (add1 start)) 7)
+     (define subtype
+       (+ (bytes-ref bs (add1 start)) 7))
+     (case subtype
        [(8)  (decode-int32       bs start)]
        [(9)  (decode-uint/64/128 bs start)]
        [(10) (decode-uint/64/128 bs start)]
@@ -162,15 +167,16 @@
        [(12) (decode-dcc         bs start)]
        [(13) (decode-end-marker  bs start)]
        [(14) (decode-boolean     bs start)]
-       [(15) (decode-float       bs start)])]))
+       [(15) (decode-float       bs start)]
+       [else (raise-argument-error 'decode-field "(integer-in 8 15)" subtype)])]))
 
-(define (decode-size bs i)
+(define (decode-size bs i [npos (add1 i)])
   (define b (bytes-ref bs i))
   (match (bitwise-and #b00011111 b)
-    [31 (values (+ 4 i) (+ (decode-integer bs (add1 i) 3) 65821))]
-    [30 (values (+ 3 i) (+ (decode-integer bs (add1 i) 2) 285))]
-    [29 (values (+ 2 i) (+ (decode-integer bs (add1 i) 1) 29))]
-    [s  (values (+ 1 i) s)]))
+    [31 (values (+ 3 npos) (+ (decode-integer bs npos 3) 65821))]
+    [30 (values (+ 2 npos) (+ (decode-integer bs npos 2) 285))]
+    [29 (values (+ 1 npos) (+ (decode-integer bs npos 1) 29))]
+    [s  (values      npos  s)]))
 
 (define (decode-integer bs start size)
   (for/fold ([n 0])
@@ -202,7 +208,9 @@
                                  (bytes-ref bs (+ 3 start)))))]
 
     [(3) (values (+ 5 start)
-                 (decode-integer bs (add1 start) 4))]))
+                 (decode-integer bs (add1 start) 4))]
+
+    [else (raise-argument-error 'decode-pointer "a valid pointer" b)]))
 
 (define (decode-string bs start)
   (define-values (data-start size)
@@ -278,11 +286,11 @@
 
 (define (decode-array bs start)
   (define-values (data-start num-items)
-    (decode-size bs start))
+    (decode-size bs start (+ start 2)))
 
   (let loop ([a null]
              [rem num-items]
-             [pos (add1 data-start)]) ;; add1 because it's an extended type
+             [pos data-start])
     (cond
       [(= rem 0)
        (values pos (reverse a))]
