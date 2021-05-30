@@ -1,6 +1,8 @@
 #lang racket/base
 
 (require geoip/private/decoder
+         geoip/private/encoder
+         rackcheck
          racket/list
          racket/port
          rackunit)
@@ -120,7 +122,38 @@
     (check-equal? (decode-integer #"\x10" 0 1) 16)
     (check-equal? (decode-integer #"\xFF\x36" 0 2) #xFF36)
     (check-equal? (decode-integer #"\xFF\xFF\xFF\x10" 0 4) #xFFFFFF10)
-    (check-equal? (decode-integer #"\242\377\20" 1 2) #xFF10))))
+    (check-equal? (decode-integer #"\242\377\20" 1 2) #xFF10))
+
+   (test-suite
+    "property checks"
+
+    (test-case "roundtrip"
+      (define gen:value
+        (gen:frequency
+         `((5 . ,gen:natural)
+           (5 . ,gen:real)
+           (5 . ,(gen:integer-in (- (expt 2 31)) 0))
+           (5 . ,(gen:integer-in 0 (sub1 (expt 2 31))))
+           (5 . ,(gen:bytes))
+           (5 . ,(gen:string))
+           (1 . ,(gen:list (gen:delay gen:value) #:max-length 5))
+           (1 . ,(gen:let
+                   ([ks (gen:list (gen:string) #:max-length 5)]
+                    [vs (gen:list (gen:delay gen:value) #:max-length 5)])
+                   (for/hash ([k (in-list ks)]
+                              [v (in-list vs)])
+                     (values k v)))))))
+
+      (define-property roundtrip
+        ([v gen:value])
+        (define encoded-v
+          (call-with-output-bytes
+           (lambda (out)
+             (write-field v out))))
+        (let-values ([(_ decoded-v) (decode-field encoded-v)])
+          (check-equal? decoded-v v)))
+
+      (check-property roundtrip)))))
 
 (module+ test
   (require rackunit/text-ui)
