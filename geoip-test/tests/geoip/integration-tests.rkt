@@ -45,7 +45,9 @@
        (check-equal? (country-data-translation  (geoip-lookup g "172.217.16.110") "zh-CN") "美国")))))
 
 (define (city-data-translation result lang)
-  (hash-ref (hash-ref (hash-ref result "city") "names") lang))
+  (let* ([city (hash-ref result "city" #f)]
+         [names (and city (hash-ref city "names" #f))])
+    (and names (hash-ref names lang))))
 
 (define city-tests
   (test-suite
@@ -83,13 +85,13 @@
          '(#f
            "Cluj-Napoca"
            "Salt Lake City"
-           "Tampa"
-           "Tigre"
+           #f
+           "Dique Lujan"
            "Gdansk"
            "Milton Keynes"
-           "Banstead"
+           "Cambridge"
            "Singapore"
-           "Thonon-les-Bains"
+           "Clapiers"
            "Antony"))
 
        (check-equal?
