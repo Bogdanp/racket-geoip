@@ -2,9 +2,9 @@
 
 (require geoip/private/decoder
          geoip/private/encoder
-         rackcheck
          racket/list
          racket/port
+         racket/string
          rackunit)
 
 (provide
@@ -124,6 +124,7 @@
     (check-equal? (decode-integer #"\xFF\xFF\xFF\x10" 0 4) #xFFFFFF10)
     (check-equal? (decode-integer #"\242\377\20" 1 2) #xFF10))
 
+   #;
    (test-suite
     "property checks"
 
