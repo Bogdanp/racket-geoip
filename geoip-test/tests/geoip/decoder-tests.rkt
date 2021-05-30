@@ -1,6 +1,8 @@
 #lang racket/base
 
 (require geoip/private/decoder
+         racket/list
+         racket/port
          rackunit)
 
 (provide
@@ -113,7 +115,14 @@
                                             #b00000010 #b00000100
                                             #b10100001 1
                                             #b10100001 2))
-                   (hash "a" '(1 2))))
+                   (hash "a" '(1 2)))
+
+     (check-equal? (decode-one-field (call-with-output-bytes
+                                      (lambda (out)
+                                        (write-bytes (bytes #b00011101 #b00000100 #b00000011) out)
+                                        (for/list ([_ (in-range 32)])
+                                          (write-bytes (bytes #b10100001 1) out)))))
+                   (make-list 32 1)))
 
     (test-suite
      "booleans"
