@@ -15,10 +15,10 @@
 
     [(exact-integer? v)
      (cond
-       [(<  v 0) (write-int32 v out)]
-       [(<= v (sub1 (expt 2 16)))  (write-uint16 v out)]
-       [(<= v (sub1 (expt 2 32)))  (write-uint32 v out)]
-       [(<= v (sub1 (expt 2 64)))  (write-uint64 v out)]
+       [(<  v 0)                   (write-int32   v out)]
+       [(<= v (sub1 (expt 2 16)))  (write-uint16  v out)]
+       [(<= v (sub1 (expt 2 32)))  (write-uint32  v out)]
+       [(<= v (sub1 (expt 2 64)))  (write-uint64  v out)]
        [(<= v (sub1 (expt 2 128))) (write-uint128 v out)]
        [else (raise-argument-error 'write-field "(integer-in (- (sub1 expt 2 31)) (sub1 (expt 2 128)))" v)])]
 
@@ -40,28 +40,16 @@
      (write-control type #f size out)]
 
     [(type subtype size out)
-     (cond
-       [(>= size 65821)
-        (let ([size (- size 65821)])
-          (write-byte (bitwise-ior type #b00011111) out)
-          (when subtype (write-byte (- subtype 7) out))
-          (write-integer size 3 out))]
-
-       [(>= size 285)
-        (let ([size (- size 285)])
-          (write-byte (bitwise-ior type #b00011110) out)
-          (when subtype (write-byte (- subtype 7) out))
-          (write-integer size 2 out))]
-
-       [(>= size 29)
-        (let ([size (- size 29)])
-          (write-byte (bitwise-ior type #b00011101) out)
-          (when subtype (write-byte (- subtype 7) out))
-          (write-integer size 1 out))]
-
-       [else
-        (b:write-byte (bitwise-ior type size) out)
-        (when subtype (write-byte (- subtype 7) out))])]))
+     (define-values (control int int-size)
+       (cond
+         [(>= size 65821) (values (bitwise-ior type #b00011111) (- size 65821) 3)]
+         [(>= size 285)   (values (bitwise-ior type #b00011110) (- size 285)   2)]
+         [(>= size 29)    (values (bitwise-ior type #b00011101) (- size 29)    1)]
+         [else            (values (bitwise-ior type size)       0              0)]))
+     (b:write-byte control out)
+     (when subtype (b:write-byte (- subtype 7) out))
+     (unless (zero? int-size)
+       (write-integer int int-size out))]))
 
 (define (write-integer n size [out (current-output-port)])
   (let loop ([bs null] [n n] [remaining size])
