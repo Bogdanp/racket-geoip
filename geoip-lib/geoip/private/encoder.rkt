@@ -34,12 +34,12 @@
 (define write-control
   (case-lambda
     [(type size)
-     (write-control type size #f (current-output-port))]
+     (write-control type #f size (current-output-port))]
 
     [(type size out)
-     (write-control type size #f out)]
+     (write-control type #f size out)]
 
-    [(type size subtype out)
+    [(type subtype size out)
      (cond
        [(>= size 65821)
         (let ([size (- size 65821)])
@@ -133,22 +133,22 @@
     (integer-bytes->integer
      (integer->integer-bytes n 4 #t #t)
      #f #t))
-  (write-control 0 4 8 out)
+  (write-control 0 8 4 out)
   (write-integer reinterpreted 4 out))
 
 (define (write-uint64 n [out (current-output-port)])
-  (write-control 0 8 9 out)
+  (write-control 0 9 8 out)
   (write-integer n 2 out))
 
 (define (write-uint128 n [out (current-output-port)])
-  (write-control 0 16 10 out)
+  (write-control 0 10 16 out)
   (write-integer n 4 out))
 
 (define (write-array vs [out (current-output-port)])
   (define len (length vs))
-  (write-control 0 len 11 out)
+  (write-control 0 11 len out)
   (for ([v (in-list vs)])
     (write-field v out)))
 
 (define (write-boolean v [out (current-output-port)])
-  (write-control 0 (if v 1 0) 14 out))
+  (write-control 0 14 (if v 1 0) out))
