@@ -5,7 +5,8 @@
          racket/runtime-path
          rackunit)
 
-(provide integration-tests)
+(provide
+ integration-tests)
 
 (define-runtime-path country-db-path
   (build-path 'up 'up "fixtures" "dbs" "GeoLite2-Country.mmdb"))
@@ -88,14 +89,14 @@
          '(#f
            "Cluj-Napoca"
            "Salt Lake City"
-           #f
-           "Dique Lujan"
+           "Orlando"
+           "Belen de Escobar"
            "Gdansk"
-           "Milton Keynes"
-           "Cambridge"
+           "Manchester"
+           "Keighley"
            "Singapore"
-           "Clapiers"
-           "Antony"))
+           "Jacou"
+           "Wissous"))
 
        (check-equal?
         (for/list ([addr (in-list addrs)])

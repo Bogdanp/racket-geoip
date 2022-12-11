@@ -2,9 +2,9 @@
 
 (require geoip/private/decoder
          geoip/private/encoder
+         rackcheck
          racket/list
          racket/port
-         racket/string
          rackunit)
 
 (provide
@@ -12,12 +12,24 @@
 
 (define-check (check-pointer= bs expected-value)
   (let-values ([(_ value) (decode-pointer bs 0)])
-    (check-eqv? value expected-value)))
+    (unless (eqv? value expected-value)
+      (with-check-info
+        (['value value]
+         ['expected expected-value])
+        (fail-check)))))
 
 (define-check (check-pos&field bs expected-pos expected-value)
   (let-values ([(pos value) (decode-field bs)])
-    (check-equal? pos expected-pos)
-    (check-equal? value expected-value)))
+    (unless (equal? pos expected-pos)
+      (with-check-info
+        (['pos pos]
+         ['expected expected-pos])
+        (fail-check)))
+    (unless (equal? value expected-value)
+      (with-check-info
+        (['value value]
+         ['expected expected-value])
+        (fail-check)))))
 
 (define decoder-tests
   (test-suite
@@ -124,7 +136,6 @@
     (check-equal? (decode-integer #"\xFF\xFF\xFF\x10" 0 4) #xFFFFFF10)
     (check-equal? (decode-integer #"\242\377\20" 1 2) #xFF10))
 
-   #;
    (test-suite
     "property checks"
 
