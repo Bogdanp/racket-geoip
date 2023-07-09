@@ -1,3 +1,3 @@
 #lang info
 
-(define scribblings '(("geoip.scrbl")))
+(define scribblings '(("geoip.scrbl" () (net-library))))
