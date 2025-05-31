@@ -1,5 +1,8 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+  schedule:
+    - cron: "0 8 * * MON"
 jobs:
   build:
     name: Build & Test on Racket ${{ matrix.version }}
