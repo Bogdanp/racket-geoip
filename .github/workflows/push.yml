@@ -6,10 +6,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['6.7', 'stable']
+        version: ['stable', 'current']
     steps:
       - uses: actions/checkout@master
-      - uses: Bogdanp/setup-racket@v1.9
+      - uses: Bogdanp/setup-racket@v1.13
         with:
           architecture: x64
           version: ${{ matrix.version }}
