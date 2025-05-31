@@ -90,13 +90,13 @@
            "Cluj-Napoca"
            "Salt Lake City"
            "Orlando"
-           "Pilar"
+           "Buenos Aires"
            "Gdansk"
-           "Huddersfield"
-           "London"
-           #f
+           "Milton Keynes"
+           "Twickenham"
+           "Singapore"
            "Jacou"
-           "Antony"))
+           "Wissous"))
 
        (check-equal?
         (for/list ([addr (in-list addrs)])
