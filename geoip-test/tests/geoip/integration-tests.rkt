@@ -92,7 +92,7 @@
            "Orlando"
            "Buenos Aires"
            "Gdansk"
-           "Milton Keynes"
+           "Huddersfield"
            "Twickenham"
            "Singapore"
            "Jacou"
