@@ -90,10 +90,10 @@
            "Cluj-Napoca"
            "Salt Lake City"
            "Orlando"
-           "Buenos Aires"
+           "Belén de Escobar"
            "Gdansk"
            "Huddersfield"
-           "Twickenham"
+           "Warrington"
            "Singapore"
            "Jacou"
            "Wissous"))
