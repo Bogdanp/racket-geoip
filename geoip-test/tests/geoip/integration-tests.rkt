@@ -93,10 +93,10 @@
            "Belén de Escobar"
            "Gdansk"
            "Huddersfield"
-           "Warrington"
+           "Sheffield"
            "Singapore"
            "Jacou"
-           "Wissous"))
+           "Antony"))
 
        (check-equal?
         (for/list ([addr (in-list addrs)])
