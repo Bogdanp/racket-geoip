@@ -92,7 +92,7 @@
            "Orlando"
            "Belén de Escobar"
            "Gdansk"
-           "Huddersfield"
+           "Milton Keynes"
            "Sheffield"
            "Singapore"
            "Jacou"
