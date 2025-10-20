@@ -93,10 +93,10 @@
            "Tigre"
            "Gdansk"
            "Huddersfield"
-           "Sheffield"
+           "Southwark"
            "Singapore"
-           "Jacou"
-           "Antony"))
+           "Montferrier-sur-Lez"
+           "Wissous"))
 
        (check-equal?
         (for/list ([addr (in-list addrs)])
