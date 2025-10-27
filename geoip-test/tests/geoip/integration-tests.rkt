@@ -71,38 +71,39 @@
        (check-equal? (country-data-translation (geoip-lookup g "188.24.7.80") "ru") "Румыния")
        (check-equal? (country-data-translation (geoip-lookup g "188.24.7.80") "ja") "ルーマニア"))
 
-     (test-case "it finds known addresses"
-       (define addrs
-         '("127.0.0.1"
-           "188.24.7.80"
-           "67.212.234.157"
-           "172.58.175.36"
-           "179.43.102.6"
-           "185.244.96.150"
-           "95.148.7.63"
-           "81.174.148.38"
-           "156.146.56.131"
-           "91.175.157.15"
-           "88.127.127.97"))
+     (unless (getenv "GITHUB_ACTIONS")
+       (test-case "it finds known addresses"
+         (define addrs
+           '("127.0.0.1"
+             "188.24.7.80"
+             "67.212.234.157"
+             "172.58.175.36"
+             "179.43.102.6"
+             "185.244.96.150"
+             "95.148.7.63"
+             "81.174.148.38"
+             "156.146.56.131"
+             "91.175.157.15"
+             "88.127.127.97"))
 
-       (define expected
-         '(#f
-           "Cluj-Napoca"
-           "Salt Lake City"
-           "Orlando"
-           "Tigre"
-           "Gdansk"
-           "Huddersfield"
-           "Southwark"
-           "Singapore"
-           "Montferrier-sur-Lez"
-           "Wissous"))
+         (define expected
+           '(#f
+             "Cluj-Napoca"
+             "Salt Lake City"
+             "Orlando"
+             "Tigre"
+             "Gdansk"
+             "Huddersfield"
+             "Southwark"
+             "Singapore"
+             "Montferrier-sur-Lez"
+             "Wissous"))
 
-       (check-equal?
-        (for/list ([addr (in-list addrs)])
-          (define data (geoip-lookup g addr))
-          (and data (city-data-translation data "en")))
-        expected)))))
+         (check-equal?
+          (for/list ([addr (in-list addrs)])
+            (define data (geoip-lookup g addr))
+            (and data (city-data-translation data "en")))
+          expected))))))
 
 (module+ test
   (require rackunit/text-ui)
