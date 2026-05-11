@@ -66,7 +66,7 @@
      (test-case "it returns expected results given a known IP address"
        (define res (geoip-lookup g "188.24.7.80"))
        (check-equal? (city-data-translation res "en") "Cluj-Napoca")
-       (check-equal? (city-data-translation res "ja") "クルジュ＝ナポカ")
+       (check-equal? (city-data-translation res "ja") "クルージュ・ナポカ")
        (check-equal? (country-data-iso-code (geoip-lookup g "188.24.7.80")) "RO")
        (check-equal? (country-data-translation (geoip-lookup g "188.24.7.80") "ru") "Румыния")
        (check-equal? (country-data-translation (geoip-lookup g "188.24.7.80") "ja") "ルーマニア"))
